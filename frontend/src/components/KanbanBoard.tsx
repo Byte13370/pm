@@ -11,15 +11,23 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
+import { AIChatSidebar } from "@/components/AIChatSidebar";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
 import { createId, initialData, moveCard, type BoardData } from "@/lib/kanban";
-import { fetchBoard, saveBoard } from "@/lib/boardApi";
+import {
+  fetchBoard,
+  saveBoard,
+  sendAIChat,
+  type ConversationMessage,
+} from "@/lib/boardApi";
 
 export const KanbanBoard = () => {
   const [board, setBoard] = useState<BoardData | null>(null);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ConversationMessage[]>([]);
   const [syncMessage, setSyncMessage] = useState("");
 
   useEffect(() => {
@@ -148,6 +156,36 @@ export const KanbanBoard = () => {
 
   const activeCard = activeCardId ? cardsById[activeCardId] : null;
 
+  const handleAIQuestion = async (question: string) => {
+    const userMessage: ConversationMessage = { role: "user", content: question };
+    const nextHistory = [...chatMessages, userMessage];
+    setChatMessages(nextHistory);
+    setIsChatLoading(true);
+
+    try {
+      const result = await sendAIChat(question, chatMessages);
+      setChatMessages((previous) => [
+        ...previous,
+        { role: "assistant", content: result.assistant_response },
+      ]);
+
+      if (result.board_updated) {
+        setBoard(result.board);
+        setSyncMessage("Board updated from AI response.");
+      }
+    } catch (error) {
+      const fallbackMessage =
+        error instanceof Error ? error.message : "AI request failed.";
+      setChatMessages((previous) => [
+        ...previous,
+        { role: "assistant", content: `Error: ${fallbackMessage}` },
+      ]);
+      setSyncMessage("AI request failed.");
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
+
   if (isLoading || !board) {
     return (
       <main className="mx-auto flex min-h-screen max-w-[1500px] items-center justify-center px-6">
@@ -206,32 +244,40 @@ export const KanbanBoard = () => {
           </div>
         </header>
 
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCorners}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <section className="grid gap-6 lg:grid-cols-5">
-            {board.columns.map((column) => (
-              <KanbanColumn
-                key={column.id}
-                column={column}
-                cards={column.cardIds.map((cardId) => board.cards[cardId])}
-                onRename={handleRenameColumn}
-                onAddCard={handleAddCard}
-                onDeleteCard={handleDeleteCard}
-              />
-            ))}
-          </section>
-          <DragOverlay>
-            {activeCard ? (
-              <div className="w-[260px]">
-                <KanbanCardPreview card={activeCard} />
-              </div>
-            ) : null}
-          </DragOverlay>
-        </DndContext>
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <section className="grid gap-6 lg:grid-cols-5">
+              {board.columns.map((column) => (
+                <KanbanColumn
+                  key={column.id}
+                  column={column}
+                  cards={column.cardIds.map((cardId) => board.cards[cardId])}
+                  onRename={handleRenameColumn}
+                  onAddCard={handleAddCard}
+                  onDeleteCard={handleDeleteCard}
+                />
+              ))}
+            </section>
+            <DragOverlay>
+              {activeCard ? (
+                <div className="w-[260px]">
+                  <KanbanCardPreview card={activeCard} />
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+
+          <AIChatSidebar
+            messages={chatMessages}
+            isLoading={isChatLoading}
+            onSend={handleAIQuestion}
+          />
+        </section>
       </main>
     </div>
   );

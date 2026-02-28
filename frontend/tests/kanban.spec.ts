@@ -75,3 +75,35 @@ test("logs out to login screen", async ({ page }) => {
   await page.getByRole("button", { name: /log out/i }).click();
   await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible();
 });
+
+test("ai chat updates board and refreshes UI", async ({ page }) => {
+  await page.route("**/api/ai/chat", async (route) => {
+    const boardResponse = await page.request.get("http://localhost:8000/api/board", {
+      headers: {
+        Cookie: "pm_auth=1",
+      },
+    });
+    const board = await boardResponse.json();
+    board.columns[0].title = "AI Updated Column";
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        model: "mock-model",
+        assistant_response: "Updated the first column title.",
+        board_updated: true,
+        board,
+      }),
+    });
+  });
+
+  await login(page);
+  await page.getByLabel(/ai question/i).fill("Rename first column");
+  await page.getByRole("button", { name: /ask ai/i }).click();
+
+  await expect(page.getByText(/updated the first column title/i)).toBeVisible();
+  await expect(page.locator('[data-testid^="column-"]').first().getByLabel("Column title")).toHaveValue(
+    "AI Updated Column"
+  );
+});

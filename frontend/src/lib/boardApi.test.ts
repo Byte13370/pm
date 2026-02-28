@@ -1,4 +1,4 @@
-import { fetchBoard, saveBoard } from "@/lib/boardApi";
+import { fetchBoard, saveBoard, sendAIChat } from "@/lib/boardApi";
 import { initialData } from "@/lib/kanban";
 
 describe("boardApi", () => {
@@ -48,5 +48,29 @@ describe("boardApi", () => {
     );
 
     await expect(fetchBoard()).rejects.toThrow("Authentication required");
+  });
+
+  it("sends ai chat and receives structured response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            model: "test-model",
+            assistant_response: "Done",
+            board_updated: true,
+            board: initialData,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      )
+    );
+
+    const result = await sendAIChat("Update board", []);
+    expect(result.assistant_response).toBe("Done");
+    expect(result.board_updated).toBe(true);
   });
 });

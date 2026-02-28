@@ -252,19 +252,19 @@ Add sidebar chat UX and wire it to AI backend responses, updating board when AI 
 
 ### Checklist
 
-- [ ] Add sidebar chat component to existing layout
-- [ ] Support conversation history rendering and input submission
-- [ ] Call backend AI endpoint with message/history
-- [ ] Render assistant response in chat stream
-- [ ] When response includes board update, refresh/apply board state automatically
-- [ ] Keep UX aligned with existing style system
+- [x] Add sidebar chat component to existing layout
+- [x] Support conversation history rendering and input submission
+- [x] Call backend AI endpoint with message/history
+- [x] Render assistant response in chat stream
+- [x] When response includes board update, refresh/apply board state automatically
+- [x] Keep UX aligned with existing style system
 
 ### Tests
 
-- [ ] Component tests for sidebar input and message rendering
-- [ ] Integration tests for AI request/response lifecycle
-- [ ] Integration tests for board auto-refresh on AI update
-- [ ] E2E happy path: ask AI to update a card and verify board updates
+- [x] Component tests for sidebar input and message rendering
+- [x] Integration tests for AI request/response lifecycle
+- [x] Integration tests for board auto-refresh on AI update
+- [x] E2E happy path: ask AI to update a card and verify board updates
 
 ### Success criteria
 

@@ -11,7 +11,27 @@ describe("KanbanBoard", () => {
   beforeEach(() => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input.toString();
+
+        if (url.includes("/api/ai/chat")) {
+          const updated = cloneBoard();
+          updated.columns[0].title = "AI Updated";
+
+          return new Response(
+            JSON.stringify({
+              model: "test-model",
+              assistant_response: "I updated the first column.",
+              board_updated: true,
+              board: updated,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
         if (init?.method === "PUT") {
           return new Response(init.body as BodyInit, {
             status: 200,
@@ -81,5 +101,18 @@ describe("KanbanBoard", () => {
       "/api/board",
       expect.objectContaining({ method: "PUT" })
     );
+  });
+
+  it("sends ai chat request and refreshes board when ai updates it", async () => {
+    render(<KanbanBoard />);
+    await screen.findAllByTestId(/column-/i);
+
+    await userEvent.type(screen.getByLabelText(/ai question/i), "Rename first column");
+    await userEvent.click(screen.getByRole("button", { name: /ask ai/i }));
+
+    expect(await screen.findByText(/i updated the first column/i)).toBeInTheDocument();
+
+    const firstColumn = getFirstColumn();
+    expect(within(firstColumn).getByLabelText("Column title")).toHaveValue("AI Updated");
   });
 });
