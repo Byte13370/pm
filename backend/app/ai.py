@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 import httpx
 
@@ -63,7 +64,27 @@ def build_model_candidates() -> list[str]:
     return preferred + remaining
 
 
-def ask_openrouter(prompt: str) -> tuple[str, str]:
+def _extract_content(message: dict[str, Any]) -> str | None:
+    content = message.get("content")
+    if isinstance(content, str) and content.strip():
+        return content.strip()
+
+    if isinstance(content, list):
+        text_parts: list[str] = []
+        for item in content:
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") == "text" and isinstance(item.get("text"), str):
+                text_parts.append(item["text"])
+
+        combined = "\n".join(part.strip() for part in text_parts if part.strip())
+        if combined:
+            return combined
+
+    return None
+
+
+def ask_openrouter_messages(messages: list[dict[str, str]]) -> tuple[str, str]:
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         raise RuntimeError("OPENROUTER_API_KEY is not configured")
@@ -80,7 +101,7 @@ def ask_openrouter(prompt: str) -> tuple[str, str]:
     for model in models_to_try:
         payload = {
             "model": model,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": messages,
         }
 
         try:
@@ -109,13 +130,17 @@ def ask_openrouter(prompt: str) -> tuple[str, str]:
             continue
 
         message = choices[0].get("message") or {}
-        content = message.get("content")
-        if isinstance(content, str) and content.strip():
-            return content.strip(), model
+        content = _extract_content(message)
+        if content:
+            return content, model
 
         last_error = f"OpenRouter returned empty content for model {model}"
 
     raise RuntimeError(last_error or "No available OpenRouter model responded")
+
+
+def ask_openrouter(prompt: str) -> tuple[str, str]:
+    return ask_openrouter_messages([{"role": "user", "content": prompt}])
 
 
 def connectivity_test() -> dict[str, str]:

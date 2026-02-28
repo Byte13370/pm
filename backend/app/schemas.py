@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, model_validator
 
 
@@ -34,3 +36,25 @@ class BoardData(BaseModel):
             raise ValueError(f"Missing cards referenced by columns: {', '.join(missing_card_ids)}")
 
         return self
+
+
+class ConversationMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class AIChatRequest(BaseModel):
+    question: str
+    history: list[ConversationMessage] = []
+
+
+class AIStructuredOutput(BaseModel):
+    assistant_response: str
+    board_update: BoardData | None = None
+
+
+class AIChatResponse(BaseModel):
+    model: str
+    assistant_response: str
+    board_updated: bool
+    board: BoardData

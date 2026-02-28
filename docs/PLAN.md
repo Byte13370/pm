@@ -225,18 +225,18 @@ Send board JSON + user message + history to model and receive structured output 
 
 ### Checklist
 
-- [ ] Define structured output schema (assistant message + optional board patch/full board)
-- [ ] Implement prompt construction including board JSON and conversation history
-- [ ] Validate model output against schema
-- [ ] Apply optional board update transactionally when valid
-- [ ] Return assistant reply and new board state to caller
+- [x] Define structured output schema (assistant message + optional board patch/full board)
+- [x] Implement prompt construction including board JSON and conversation history
+- [x] Validate model output against schema
+- [x] Apply optional board update transactionally when valid
+- [x] Return assistant reply and new board state to caller
 
 ### Tests
 
-- [ ] Unit tests for schema validation and parser behavior
-- [ ] Unit tests for board update application logic
-- [ ] Backend tests for no-update vs update responses
-- [ ] Failure-path tests for malformed model outputs
+- [x] Unit tests for schema validation and parser behavior
+- [x] Unit tests for board update application logic
+- [x] Backend tests for no-update vs update responses
+- [x] Failure-path tests for malformed model outputs
 
 ### Success criteria
 
