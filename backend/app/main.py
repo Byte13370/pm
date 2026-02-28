@@ -6,6 +6,7 @@ from fastapi import Response
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.ai import connectivity_test
 from app.auth import require_authenticated_username
 from app.db import get_board_for_username, initialize_database, replace_board_for_username
 from app.schemas import BoardData
@@ -53,6 +54,21 @@ def update_board(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     return BoardData.model_validate(updated)
+
+
+@app.post("/api/ai/test")
+def ai_connectivity_test(
+    username: str = Depends(require_authenticated_username),
+) -> dict[str, str]:
+    _ = username
+
+    try:
+        return connectivity_test()
+    except RuntimeError as exc:
+        message = str(exc)
+        if "OPENROUTER_API_KEY" in message:
+            raise HTTPException(status_code=500, detail=message) from exc
+        raise HTTPException(status_code=502, detail=message) from exc
 
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)

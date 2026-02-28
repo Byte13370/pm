@@ -173,17 +173,17 @@ Switch frontend from in-memory board to backend-driven persistence.
 
 ### Checklist
 
-- [ ] Add frontend API client for board fetch/update
-- [ ] Load initial board from backend after auth
-- [ ] Persist user actions (rename/add/delete/move) through backend API
-- [ ] Add loading/error states with minimal UX impact
-- [ ] Keep UI interactions responsive and consistent
+- [x] Add frontend API client for board fetch/update
+- [x] Load initial board from backend after auth
+- [x] Persist user actions (rename/add/delete/move) through backend API
+- [x] Add loading/error states with minimal UX impact
+- [x] Keep UI interactions responsive and consistent
 
 ### Tests
 
-- [ ] Unit tests for API client and state adapters
-- [ ] Integration tests for UI actions triggering API updates
-- [ ] E2E test confirms board changes persist after reload
+- [x] Unit tests for API client and state adapters
+- [x] Integration tests for UI actions triggering API updates
+- [x] E2E test confirms board changes persist after reload
 
 ### Success criteria
 
@@ -199,17 +199,17 @@ Enable backend AI call through OpenRouter and verify baseline connectivity.
 
 ### Checklist
 
-- [ ] Add backend OpenRouter client configuration via environment variable
-- [ ] Configure model to a free OpenRouter model (per user constraint)
-- [ ] Implement minimal backend function to send a prompt
-- [ ] Add test route/diagnostic path for connectivity check
-- [ ] Keep key in local `.env` only
+- [x] Add backend OpenRouter client configuration via environment variable
+- [x] Configure model to a free OpenRouter model (per user constraint)
+- [x] Implement minimal backend function to send a prompt
+- [x] Add test route/diagnostic path for connectivity check
+- [x] Keep key in local `.env` only
 
 ### Tests
 
-- [ ] Connectivity check using prompt `2+2`
-- [ ] Validate non-empty model response and expected semantic answer (`4`)
-- [ ] Verify graceful error handling for missing/invalid key
+- [x] Connectivity check using prompt `2+2`
+- [x] Validate non-empty model response and expected semantic answer (`4`)
+- [x] Verify graceful error handling for missing/invalid key
 
 ### Success criteria
 

@@ -13,14 +13,29 @@ test("loads the kanban board", async ({ page }) => {
   await expect(page.locator('[data-testid^="column-"]')).toHaveCount(5);
 });
 
-test("adds a card to a column", async ({ page }) => {
+test("persists a column rename after reload", async ({ page }) => {
   await login(page);
+  const renamedTitle = `Backlog ${Date.now()}`;
   const firstColumn = page.locator('[data-testid^="column-"]').first();
-  await firstColumn.getByRole("button", { name: /add a card/i }).click();
-  await firstColumn.getByPlaceholder("Card title").fill("Playwright card");
-  await firstColumn.getByPlaceholder("Details").fill("Added via e2e.");
-  await firstColumn.getByRole("button", { name: /add card/i }).click();
-  await expect(firstColumn.getByText("Playwright card")).toBeVisible();
+  const titleInput = firstColumn.getByLabel("Column title");
+
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/board") &&
+        response.request().method() === "PUT" &&
+        response.ok()
+    ),
+    titleInput.fill(renamedTitle),
+  ]);
+
+  await expect(titleInput).toHaveValue(renamedTitle);
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Kanban Studio" })).toBeVisible();
+  await expect(page.locator('[data-testid^="column-"]').first().getByLabel("Column title")).toHaveValue(
+    renamedTitle
+  );
 });
 
 test("moves a card between columns", async ({ page }) => {
