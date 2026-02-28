@@ -1,0 +1,10 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: pm-backend
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
