@@ -272,9 +272,43 @@ Add sidebar chat UX and wire it to AI backend responses, updating board when AI 
 - AI-originated board updates appear in UI without manual reload
 - Core chat + board flows are covered by automated tests
 
+## Part 11: Real signup + Supabase Auth + Supabase Postgres
+
+### Scope
+
+Replace fake sign-in with real signup/login via Supabase Auth and move persistence from local SQLite to Supabase Postgres while keeping backend API contracts stable.
+
+### Checklist
+
+- [ ] Add Supabase project configuration and environment variables for frontend and backend
+- [ ] Add frontend signup/login flow using `@supabase/supabase-js`
+- [ ] Replace cookie-based fake auth with bearer-token auth from Supabase session
+- [ ] Verify Supabase JWT on backend using JWKS and extract authenticated user identity
+- [ ] Replace SQLite repository with Postgres repository against Supabase database
+- [ ] Add backend user upsert keyed by Supabase user id (`sub`) and one-board-per-user mapping
+- [ ] Keep `/api/board` and `/api/ai/chat` request/response contracts unchanged for UI compatibility
+- [ ] Update docker/local startup docs for Supabase-backed configuration
+- [ ] Replace auth/db tests and add signup/login integration coverage
+
+### Tests
+
+- [ ] Backend unit tests for token parsing and JWT validation error paths
+- [ ] Backend repository tests for board read/write with Postgres upsert semantics
+- [ ] API tests for unauthorized, authorized, and first-login user bootstrap flows
+- [ ] Frontend unit tests for signup/login/logout states using mocked Supabase client
+- [ ] E2E: signup new user, create/move card, reload confirms persistence
+
+### Success criteria
+
+- User can sign up and sign in with Supabase credentials
+- Backend only serves board/AI routes for valid Supabase-authenticated users
+- Board data persists in Supabase Postgres and survives restart/redeploy
+- Existing Kanban + AI UX remains functional without endpoint contract changes
+
 ## Approval gate
 
 Implementation should proceed part-by-part and pause at key approval gates:
 
 - [x] Approval after Part 1 (this plan)
 - [x] Approval after Part 5 (database design)
+- [ ] Approval after Part 11 design review (auth + Supabase integration)

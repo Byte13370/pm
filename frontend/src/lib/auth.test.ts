@@ -1,31 +1,62 @@
 import {
-  AUTH_COOKIE_NAME,
-  AUTH_COOKIE_VALUE,
-  buildAuthCookie,
-  buildClearAuthCookie,
-  hasAuthCookie,
-  validateCredentials,
+  getAccessToken,
+  signInWithPassword,
+  signOut,
+  signUpWithPassword,
 } from "@/lib/auth";
 
+const { getSession, signInWithPasswordMock, signUpMock, signOutMock } = vi.hoisted(() => ({
+  getSession: vi.fn(),
+  signInWithPasswordMock: vi.fn(),
+  signUpMock: vi.fn(),
+  signOutMock: vi.fn(),
+}));
+
+vi.mock("@/lib/supabase", () => ({
+  supabase: {
+    auth: {
+      getSession,
+      signInWithPassword: signInWithPasswordMock,
+      signUp: signUpMock,
+      signOut: signOutMock,
+    },
+  },
+}));
+
 describe("auth helpers", () => {
-  it("accepts dummy credentials", () => {
-    expect(validateCredentials("user", "password")).toBe(true);
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it("rejects invalid credentials", () => {
-    expect(validateCredentials("wrong", "password")).toBe(false);
-    expect(validateCredentials("user", "wrong")).toBe(false);
+  it("reads access token from current session", async () => {
+    getSession.mockResolvedValue({
+      data: { session: { access_token: "token-123" } },
+    });
+
+    await expect(getAccessToken()).resolves.toBe("token-123");
   });
 
-  it("detects auth cookie", () => {
-    const cookie = `${AUTH_COOKIE_NAME}=${AUTH_COOKIE_VALUE}; other=value`;
-    expect(hasAuthCookie(cookie)).toBe(true);
-    expect(hasAuthCookie("other=value")).toBe(false);
+  it("signs in with email/password", async () => {
+    signInWithPasswordMock.mockResolvedValue({ error: null });
+
+    await expect(signInWithPassword("user@example.com", "password123")).resolves.toBeUndefined();
+    expect(signInWithPasswordMock).toHaveBeenCalledWith({
+      email: "user@example.com",
+      password: "password123",
+    });
   });
 
-  it("builds auth and clear cookie values", () => {
-    expect(buildAuthCookie()).toContain(`${AUTH_COOKIE_NAME}=${AUTH_COOKIE_VALUE}`);
-    expect(buildClearAuthCookie()).toContain(`${AUTH_COOKIE_NAME}=`);
-    expect(buildClearAuthCookie()).toContain("Max-Age=0");
+  it("returns confirmation requirement when signup has no session", async () => {
+    signUpMock.mockResolvedValue({ data: { session: null }, error: null });
+
+    await expect(signUpWithPassword("new@example.com", "password123")).resolves.toEqual({
+      requiresEmailConfirmation: true,
+    });
+  });
+
+  it("signs out current session", async () => {
+    signOutMock.mockResolvedValue({ error: null });
+
+    await expect(signOut()).resolves.toBeUndefined();
   });
 });

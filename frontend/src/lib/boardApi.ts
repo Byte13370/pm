@@ -1,4 +1,5 @@
 import type { BoardData } from "@/lib/kanban";
+import { getAccessToken } from "@/lib/auth";
 
 export type ConversationMessage = {
   role: "user" | "assistant";
@@ -10,6 +11,18 @@ export type AIChatResponse = {
   assistant_response: string;
   board_updated: boolean;
   board: BoardData;
+};
+
+const withAuthHeaders = async (headers?: HeadersInit): Promise<HeadersInit> => {
+  const token = await getAccessToken();
+  if (!token) {
+    return headers ?? {};
+  }
+
+  return {
+    ...(headers ?? {}),
+    Authorization: `Bearer ${token}`,
+  };
 };
 
 const getErrorMessage = async (response: Response) => {
@@ -28,7 +41,7 @@ const getErrorMessage = async (response: Response) => {
 export const fetchBoard = async (): Promise<BoardData> => {
   const response = await fetch("/api/board", {
     method: "GET",
-    credentials: "include",
+    headers: await withAuthHeaders(),
   });
 
   if (!response.ok) {
@@ -41,10 +54,9 @@ export const fetchBoard = async (): Promise<BoardData> => {
 export const saveBoard = async (board: BoardData): Promise<BoardData> => {
   const response = await fetch("/api/board", {
     method: "PUT",
-    headers: {
+    headers: await withAuthHeaders({
       "Content-Type": "application/json",
-    },
-    credentials: "include",
+    }),
     body: JSON.stringify(board),
   });
 
@@ -61,10 +73,9 @@ export const sendAIChat = async (
 ): Promise<AIChatResponse> => {
   const response = await fetch("/api/ai/chat", {
     method: "POST",
-    headers: {
+    headers: await withAuthHeaders({
       "Content-Type": "application/json",
-    },
-    credentials: "include",
+    }),
     body: JSON.stringify({ question, history }),
   });
 

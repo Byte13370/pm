@@ -1,12 +1,23 @@
 import { fetchBoard, saveBoard, sendAIChat } from "@/lib/boardApi";
 import { initialData } from "@/lib/kanban";
 
+const { getAccessToken } = vi.hoisted(() => ({
+  getAccessToken: vi.fn(),
+}));
+
+vi.mock("@/lib/auth", () => ({
+  getAccessToken,
+}));
+
 describe("boardApi", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.clearAllMocks();
   });
 
   it("fetches board data", async () => {
+    getAccessToken.mockResolvedValue("token-123");
+
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -22,6 +33,8 @@ describe("boardApi", () => {
   });
 
   it("saves board data", async () => {
+    getAccessToken.mockResolvedValue("token-123");
+
     vi.stubGlobal(
       "fetch",
       vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) =>
@@ -37,6 +50,8 @@ describe("boardApi", () => {
   });
 
   it("throws when fetch fails", async () => {
+    getAccessToken.mockResolvedValue(null);
+
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -51,6 +66,8 @@ describe("boardApi", () => {
   });
 
   it("sends ai chat and receives structured response", async () => {
+    getAccessToken.mockResolvedValue("token-123");
+
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>

@@ -8,8 +8,8 @@ from fastapi.staticfiles import StaticFiles
 
 from app.ai import connectivity_test
 from app.ai_chat import run_structured_board_assistant
-from app.auth import require_authenticated_username
-from app.db import get_board_for_username, initialize_database, replace_board_for_username
+from app.auth import AuthenticatedUser, require_authenticated_user
+from app.db import get_board_for_user, initialize_database, replace_board_for_user
 from app.schemas import AIChatRequest, AIChatResponse, BoardData
 
 
@@ -35,9 +35,9 @@ def hello() -> dict[str, str]:
 
 
 @app.get("/api/board", response_model=BoardData)
-def get_board(username: str = Depends(require_authenticated_username)) -> BoardData:
+def get_board(user: AuthenticatedUser = Depends(require_authenticated_user)) -> BoardData:
     try:
-        board_data = get_board_for_username(username)
+        board_data = get_board_for_user(user.sub, user.email)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -47,10 +47,10 @@ def get_board(username: str = Depends(require_authenticated_username)) -> BoardD
 @app.put("/api/board", response_model=BoardData)
 def update_board(
     board: BoardData,
-    username: str = Depends(require_authenticated_username),
+    user: AuthenticatedUser = Depends(require_authenticated_user),
 ) -> BoardData:
     try:
-        updated = replace_board_for_username(username, board.model_dump())
+        updated = replace_board_for_user(user.sub, user.email, board.model_dump())
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -59,9 +59,9 @@ def update_board(
 
 @app.post("/api/ai/test")
 def ai_connectivity_test(
-    username: str = Depends(require_authenticated_username),
+    user: AuthenticatedUser = Depends(require_authenticated_user),
 ) -> dict[str, str]:
-    _ = username
+    _ = user
 
     try:
         return connectivity_test()
@@ -75,10 +75,10 @@ def ai_connectivity_test(
 @app.post("/api/ai/chat", response_model=AIChatResponse)
 def ai_chat(
     payload: AIChatRequest,
-    username: str = Depends(require_authenticated_username),
+    user: AuthenticatedUser = Depends(require_authenticated_user),
 ) -> AIChatResponse:
     try:
-        current_board = BoardData.model_validate(get_board_for_username(username))
+        current_board = BoardData.model_validate(get_board_for_user(user.sub, user.email))
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -98,7 +98,7 @@ def ai_chat(
     board_updated = False
 
     if structured.board_update is not None:
-        persisted = replace_board_for_username(username, structured.board_update.model_dump())
+        persisted = replace_board_for_user(user.sub, user.email, structured.board_update.model_dump())
         board_to_return = BoardData.model_validate(persisted)
         board_updated = True
 

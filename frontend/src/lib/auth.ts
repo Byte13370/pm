@@ -1,23 +1,35 @@
-export const AUTH_COOKIE_NAME = "pm_auth";
-export const AUTH_COOKIE_VALUE = "1";
-export const DUMMY_USERNAME = "user";
-export const DUMMY_PASSWORD = "password";
+import { supabase } from "@/lib/supabase";
 
-export const validateCredentials = (username: string, password: string): boolean => {
-  return username.trim() === DUMMY_USERNAME && password === DUMMY_PASSWORD;
+export const getAccessToken = async (): Promise<string | null> => {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  return session?.access_token ?? null;
 };
 
-export const hasAuthCookie = (cookieHeader: string): boolean => {
-  return cookieHeader
-    .split(";")
-    .map((part) => part.trim())
-    .includes(`${AUTH_COOKIE_NAME}=${AUTH_COOKIE_VALUE}`);
+export const signInWithPassword = async (email: string, password: string): Promise<void> => {
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    throw new Error(error.message);
+  }
 };
 
-export const buildAuthCookie = (): string => {
-  return `${AUTH_COOKIE_NAME}=${AUTH_COOKIE_VALUE}; Path=/; SameSite=Lax`;
+export const signUpWithPassword = async (
+  email: string,
+  password: string
+): Promise<{ requiresEmailConfirmation: boolean }> => {
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return { requiresEmailConfirmation: !data.session };
 };
 
-export const buildClearAuthCookie = (): string => {
-  return `${AUTH_COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax`;
+export const signOut = async (): Promise<void> => {
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    throw new Error(error.message);
+  }
 };

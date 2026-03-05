@@ -1,8 +1,12 @@
 import json
 import os
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
+
+import psycopg
+from psycopg.rows import dict_row
 
 
 DEFAULT_BOARD: dict[str, Any] = {
@@ -58,6 +62,17 @@ DEFAULT_BOARD: dict[str, Any] = {
 }
 
 
+def use_postgres() -> bool:
+    return bool(os.getenv("SUPABASE_DB_URL"))
+
+
+def get_db_url() -> str:
+    db_url = os.getenv("SUPABASE_DB_URL")
+    if not db_url:
+        raise RuntimeError("SUPABASE_DB_URL is not configured")
+    return db_url
+
+
 def get_db_path() -> Path:
     configured_path = os.getenv("PM_DB_PATH")
     if configured_path:
@@ -66,7 +81,7 @@ def get_db_path() -> Path:
     return Path(__file__).resolve().parents[1] / "data" / "pm.db"
 
 
-def get_connection(db_path: Path | None = None) -> sqlite3.Connection:
+def get_sqlite_connection(db_path: Path | None = None) -> sqlite3.Connection:
     path = db_path or get_db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -75,8 +90,57 @@ def get_connection(db_path: Path | None = None) -> sqlite3.Connection:
     return connection
 
 
+@contextmanager
+def get_postgres_connection():
+    with psycopg.connect(get_db_url(), row_factory=dict_row) as connection:
+        yield connection
+
+
 def initialize_database() -> None:
-    with get_connection() as connection:
+    if use_postgres():
+        initialize_postgres_database()
+        return
+
+    initialize_sqlite_database()
+
+
+def initialize_postgres_database() -> None:
+    with get_postgres_connection() as connection:
+        cursor = connection.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+              id BIGSERIAL PRIMARY KEY,
+              supabase_user_id UUID NOT NULL UNIQUE,
+              email TEXT,
+              created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS boards (
+              id BIGSERIAL PRIMARY KEY,
+              user_id BIGINT NOT NULL UNIQUE,
+              board_json JSONB NOT NULL,
+              version INTEGER NOT NULL DEFAULT 1,
+              created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+            """
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_users_supabase_user_id ON users(supabase_user_id)"
+        )
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_boards_user_id ON boards(user_id)")
+
+        connection.commit()
+
+
+def initialize_sqlite_database() -> None:
+    with get_sqlite_connection() as connection:
         cursor = connection.cursor()
         cursor.executescript(
             """
@@ -121,10 +185,119 @@ def initialize_database() -> None:
         connection.commit()
 
 
+def _get_or_create_user_id(
+    connection: psycopg.Connection,
+    *,
+    supabase_user_id: str,
+    email: str | None,
+) -> int:
+    row = connection.cursor().execute(
+        """
+        INSERT INTO users (supabase_user_id, email)
+        VALUES (%s::uuid, %s)
+        ON CONFLICT (supabase_user_id)
+        DO UPDATE
+        SET email = COALESCE(EXCLUDED.email, users.email),
+            updated_at = NOW()
+        RETURNING id
+        """,
+        (supabase_user_id, email),
+    ).fetchone()
+
+    if row is None:
+        raise RuntimeError("Failed to resolve authenticated user")
+
+    return int(row["id"])
+
+
+def _ensure_board_for_user(connection: psycopg.Connection, user_id: int) -> None:
+    connection.cursor().execute(
+        """
+        INSERT INTO boards (user_id, board_json)
+        VALUES (%s, %s::jsonb)
+        ON CONFLICT (user_id) DO NOTHING
+        """,
+        (user_id, json.dumps(DEFAULT_BOARD)),
+    )
+
+
+def get_board_for_user(supabase_user_id: str, email: str | None) -> dict[str, Any]:
+    if not use_postgres():
+        username = (
+            "user"
+            if supabase_user_id == "00000000-0000-0000-0000-000000000001"
+            else supabase_user_id
+        )
+        return get_board_for_username(username)
+
+    with get_postgres_connection() as connection:
+        user_id = _get_or_create_user_id(
+            connection,
+            supabase_user_id=supabase_user_id,
+            email=email,
+        )
+        _ensure_board_for_user(connection, user_id)
+
+        row = connection.cursor().execute(
+            """
+            SELECT board_json::text AS board_json
+            FROM boards
+            WHERE user_id = %s
+            """,
+            (user_id,),
+        ).fetchone()
+
+        if row is None:
+            raise KeyError("Board not found for authenticated user")
+
+        connection.commit()
+        return json.loads(row["board_json"])
+
+
+def replace_board_for_user(
+    supabase_user_id: str,
+    email: str | None,
+    board_data: dict[str, Any],
+) -> dict[str, Any]:
+    if not use_postgres():
+        username = (
+            "user"
+            if supabase_user_id == "00000000-0000-0000-0000-000000000001"
+            else supabase_user_id
+        )
+        return replace_board_for_username(username, board_data)
+
+    with get_postgres_connection() as connection:
+        user_id = _get_or_create_user_id(
+            connection,
+            supabase_user_id=supabase_user_id,
+            email=email,
+        )
+
+        connection.cursor().execute(
+            """
+            INSERT INTO boards (user_id, board_json, version)
+            VALUES (%s, %s::jsonb, 1)
+            ON CONFLICT (user_id)
+            DO UPDATE
+            SET board_json = EXCLUDED.board_json,
+                version = boards.version + 1,
+                updated_at = NOW()
+            """,
+            (user_id, json.dumps(board_data)),
+        )
+
+        connection.commit()
+
+    return board_data
+
+
 def get_board_for_username(username: str) -> dict[str, Any]:
-    with get_connection() as connection:
-        cursor = connection.cursor()
-        row = cursor.execute(
+    if use_postgres():
+        raise RuntimeError("get_board_for_username is only supported in SQLite mode")
+
+    with get_sqlite_connection() as connection:
+        row = connection.cursor().execute(
             """
             SELECT b.board_json
             FROM boards b
@@ -141,7 +314,10 @@ def get_board_for_username(username: str) -> dict[str, Any]:
 
 
 def replace_board_for_username(username: str, board_data: dict[str, Any]) -> dict[str, Any]:
-    with get_connection() as connection:
+    if use_postgres():
+        raise RuntimeError("replace_board_for_username is only supported in SQLite mode")
+
+    with get_sqlite_connection() as connection:
         cursor = connection.cursor()
 
         user_row = cursor.execute(

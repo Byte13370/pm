@@ -3,12 +3,32 @@ import userEvent from "@testing-library/user-event";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { initialData } from "@/lib/kanban";
 
+const { getSession } = vi.hoisted(() => ({
+  getSession: vi.fn(),
+}));
+
+vi.mock("@/lib/supabase", () => ({
+  supabase: {
+    auth: {
+      getSession,
+      signInWithPassword: vi.fn(),
+      signUp: vi.fn(),
+      signOut: vi.fn(),
+    },
+  },
+}));
+
 const getFirstColumn = () => screen.getAllByTestId(/column-/i)[0];
 
 const cloneBoard = () => JSON.parse(JSON.stringify(initialData));
 
 describe("KanbanBoard", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
+    getSession.mockResolvedValue({
+      data: { session: { access_token: "test-token" } },
+    });
+
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
